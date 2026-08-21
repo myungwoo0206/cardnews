@@ -1,5 +1,5 @@
 "use client";
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, ClipboardEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 type Card = { text: string; image?: string; layout: "bottom" | "top" | "center" };
 const sourceSample = `이 책에서 가장 많이 반복되는 표현이자, 반드시 쓰지 말아야 한다고 정의하는 표현이 있다. 될 대로 되라지! 조금 더 일상적으로 풀어본다면 '어떻게든 되겠지' 마인드가 아닐까 싶다. 중요한 순간들에 있어서는 어떤 결과가 나오든 나와는 상관없다는 무책임한 의미가 될 수도 있다. 특히 일에서 마주치는 크고 작은 문제들에 어떻게 대처하는가에 따라 성과와 평판이 좌우되기에 결정하는 습관은 더욱 중요해진다. 그렇다면 '될 대로 되라지'라는 마인드의 반대는 기준을 갖고 결정하는 마인드이다. 무언가를 결정한다는 건 그에 따른 리스크를 감내하겠다는 의지이며, 내 결정이 틀렸더라도 이 길을 헤쳐가겠다는 다짐이다. 결정보다 중요한 것은 그 결정을 옳게 만드는 일이다. 과거에 내린 결정을 후회하는 데 시간과 에너지를 쏟지 말자.`;
 const focusSample = `중요한 순간에 '어떻게든 되겠지'라는 태도는 어떤 결과가 나오든 나와는 상관없다는 무책임한 의미가 될 수도 있다. 결정의 반대편에는 기준 없이 흘러가는 태도가 있다. 무언가를 결정한다는 건 그에 따른 리스크를 감내하겠다는 의지다. 내 결정이 틀렸더라도 이 길을 헤쳐가겠다는 다짐이기도 하다. 결정보다 중요한 것은 그 결정을 옳게 만드는 일이다.`;
@@ -10,10 +10,13 @@ function createCards(title: string, focus: string, previous: Card[]): Card[] {
 }
 export default function Home() {
   const [title, setTitle] = useState("결정이 어렵다면 지켜야 할 태도"); const [source, setSource] = useState(sourceSample); const [focus, setFocus] = useState(focusSample);
-  const [cards, setCards] = useState<Card[]>(() => createCards("결정이 어렵다면 지켜야 할 태도", focusSample, [])); const [active, setActive] = useState(0); const current = cards[active];
+  const [cards, setCards] = useState<Card[]>(() => createCards("결정이 어렵다면 지켜야 할 태도", focusSample, [])); const [active, setActive] = useState(0); const [pasteMessage, setPasteMessage] = useState("영역을 클릭하고 ⌘V"); const current = cards[active];
   useEffect(() => () => cards.forEach((c) => c.image?.startsWith("blob:") && URL.revokeObjectURL(c.image)), []);
   function generate() { setCards((old) => createCards(title, focus, old)); setActive(0); }
-  function addPhotos(event: ChangeEvent<HTMLInputElement>) { const files = Array.from(event.target.files || []); if (!files.length) return; setCards((old) => old.map((card, i) => files[i] ? { ...card, image: URL.createObjectURL(files[i]) } : card)); }
+  function placeImages(files: File[]) { const images = files.filter((file) => file.type.startsWith("image/")); if (!images.length) { setPasteMessage("이미지를 찾지 못했어요"); return; } setCards((old) => { const next = [...old]; let cursor = next.findIndex((card) => !card.image); if (cursor < 0) cursor = active; images.forEach((file) => { if (cursor >= next.length) return; next[cursor] = { ...next[cursor], image: URL.createObjectURL(file) }; cursor++; }); return next; }); setPasteMessage(`${images.length}장 추가됨`); }
+  function addPhotos(event: ChangeEvent<HTMLInputElement>) { placeImages(Array.from(event.target.files || [])); }
+  function pastePhotos(event: ClipboardEvent<HTMLDivElement>) { const files = Array.from(event.clipboardData.items).filter((item) => item.kind === "file" && item.type.startsWith("image/")).map((item) => item.getAsFile()).filter((file): file is File => Boolean(file)); if (files.length) { event.preventDefault(); placeImages(files); } else setPasteMessage("이미지를 복사하거나 캡처한 뒤 붙여넣어 주세요"); }
+  function dropPhotos(event: DragEvent<HTMLDivElement>) { event.preventDefault(); placeImages(Array.from(event.dataTransfer.files)); }
   function updateCard(patch: Partial<Card>) { setCards((old) => old.map((c, i) => i === active ? { ...c, ...patch } : c)); }
   async function saveCard(index = active) {
     const canvas = document.createElement("canvas"); await renderCard(canvas, cards[index], index);
@@ -27,6 +30,7 @@ export default function Home() {
       <label>카드뉴스 제목<input value={title} onChange={(e) => setTitle(e.target.value)} /></label><label>블로그 원문 <em>{source.length.toLocaleString()}자</em><textarea className="source" value={source} onChange={(e) => setSource(e.target.value)} /></label>
       <div className="focus-block"><label>카드로 만들 파트 <em>{focus.length}자</em><textarea value={focus} onChange={(e) => setFocus(e.target.value)} /></label><p>💡 원문 중 한 가지 메시지가 이어지는 300~700자를 붙여 넣으면 좋아요.</p></div><button className="primary" onClick={generate}>선택한 파트로 카드 구성하기 <b>→</b></button></aside>
       <section className="canvas-column"><div className="section-head"><span>02</span><div><h2>사진과 문구</h2><p>사진을 순서대로 넣고, 각 장의 문구를 다듬으세요.</p></div><label className="upload">사진 추가<input type="file" accept="image/*" multiple onChange={addPhotos}/></label></div>
+        <div tabIndex={0} onPaste={pastePhotos} onDragOver={(event) => event.preventDefault()} onDrop={dropPhotos} style={{border:"1px dashed #8d877d",background:"#f7f4ed",padding:"13px 16px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,outline:"none"}} aria-label="복사한 이미지 또는 캡처 붙여넣기"><span style={{fontSize:12,fontWeight:800}}>📋 복사한 사진·화면 캡처 붙여넣기</span><small style={{fontSize:11,color:"#777"}}>{pasteMessage}</small></div>
         <div className="editor-grid"><div className="stage"><CardCanvas card={current} index={active}/></div>
           <div className="controls"><label>이 장의 문구<textarea value={current.text} onChange={(e) => updateCard({ text: e.target.value })}/></label>
             <div className="control-row"><div><span>문구 위치</span><div className="segmented">{(["top","center","bottom"] as Card["layout"][]).map((v) => <button key={v} className={current.layout === v ? "on" : ""} onClick={() => updateCard({layout:v})}>{v === "top" ? "위" : v === "center" ? "가운데" : "아래"}</button>)}</div></div></div>
