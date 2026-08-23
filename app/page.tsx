@@ -3,9 +3,10 @@ import { ChangeEvent, ClipboardEvent, DragEvent, PointerEvent as ReactPointerEve
 type TextBlock = { text: string; x: number; y: number };
 type Card = { text: string; image?: string; layout: "bottom" | "top" | "center"; imageScale?: number; imageX?: number; imageY?: number; textX?: number; textY?: number; extraTexts?: TextBlock[] };
 function createCards(title: string, focus: string, previous: Card[]): Card[] {
-  const sentences = focus.split(/(?<=[.!?]|다\.)\s+/).map((s) => s.trim()).filter(Boolean);
+  const sentences = focus.split(/(?<=[.!?]|다\.)\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  const coverText = title.trim() || sentences.shift() || "";
   const bodyCards = sentences.slice(0, 6).map((text, index) => ({ ...previous[index + 1], text: text.length > 78 ? `${text.slice(0, 77)}…` : text, layout: previous[index + 1]?.layout || (index % 3 === 0 ? "bottom" : index % 3 === 1 ? "top" : "center") as Card["layout"] }));
-  return [{ ...previous[0], text: title, layout: previous[0]?.layout || "bottom" }, ...bodyCards];
+  return [{ ...previous[0], text: coverText, layout: previous[0]?.layout || "bottom" }, ...bodyCards];
 }
 export default function Home() {
   const [title, setTitle] = useState(""); const [source, setSource] = useState(""); const [focus, setFocus] = useState("");
