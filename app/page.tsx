@@ -1,5 +1,6 @@
 "use client";
 import { ChangeEvent, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { zipSync } from "fflate";
 type TextBlock = { text: string; x: number; y: number };
 type Card = { text: string; image?: string; image2?: string; layout: "bottom" | "top" | "center"; imageScale?: number; imageX?: number; imageY?: number; image2Scale?: number; image2X?: number; image2Y?: number; textX?: number; textY?: number; extraTexts?: TextBlock[] };
 function createCards(title: string, focus: string, previous: Card[]): Card[] {
@@ -12,6 +13,7 @@ function imageFiles(items:DataTransferItemList){return Array.from(items).filter(
 export default function Home() {
   const [title, setTitle] = useState(""); const [focus, setFocus] = useState("");
   const [cards, setCards] = useState<Card[]>(() => createCards("", "", [])); const [active, setActive] = useState(0); const [activeText, setActiveText] = useState(0); const [activeImage,setActiveImage]=useState<0|1>(0); const [editMode, setEditMode] = useState<"image" | "text">("image"); const [pasteMessage, setPasteMessage] = useState("Mac ⌘V · Windows Ctrl+V"); const current = cards[active];
+  const [zipProgress,setZipProgress]=useState<number|null>(null);
   const draggedPage = useRef<number | null>(null);
   const [dropPreview,setDropPreview]=useState<{index:number;side:"before"|"after"}|null>(null);
   useEffect(() => () => cards.forEach((c) => {if(c.image?.startsWith("blob:"))URL.revokeObjectURL(c.image);if(c.image2?.startsWith("blob:"))URL.revokeObjectURL(c.image2)}), []);
@@ -35,9 +37,9 @@ export default function Home() {
     const canvas = document.createElement("canvas"); await renderCard(canvas, cards[index], index);
     const link = document.createElement("a"); link.download = `cardletter-${index + 1}.png`; link.href = canvas.toDataURL("image/png"); link.click();
   }
-  async function saveAll() { for (let i = 0; i < cards.length; i++) { await saveCard(i); await new Promise((r) => setTimeout(r, 180)); } }
+  async function saveAll() {if(zipProgress!==null)return;setZipProgress(0);try{const files:Record<string,Uint8Array>={};const digits=Math.max(2,String(cards.length).length);for(let i=0;i<cards.length;i++){const canvas=document.createElement("canvas");await renderCard(canvas,cards[i],i);const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob((value)=>value?resolve(value):reject(new Error("PNG 생성 실패")),"image/png"));files[`cardletter-${String(i+1).padStart(digits,"0")}.png`]=new Uint8Array(await blob.arrayBuffer());setZipProgress(i+1);}const zipBlob=new Blob([zipSync(files,{level:6})],{type:"application/zip"});const url=URL.createObjectURL(zipBlob);const link=document.createElement("a");const safeName=(title.trim()||"cardletter").replace(/[\\/:*?"<>|]/g,"-");link.download=`${safeName}.zip`;link.href=url;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}finally{setZipProgress(null);}}
   const photoCount = useMemo(() => cards.reduce((count,c)=>count+(c.image?1:0)+(c.image2?1:0),0), [cards]);
-  return <main className="app-shell"><header><div className="brand"><span>CL</span><b>CARDLETTER</b><small>블로그에서 골라 만드는 카드뉴스</small></div><button className="save-all" onClick={saveAll}>전체 PNG 저장</button></header>
+  return <main className="app-shell"><header><div className="brand"><span>CL</span><b>CARDLETTER</b><small>블로그에서 골라 만드는 카드뉴스</small></div><button className="save-all" onClick={saveAll} disabled={zipProgress!==null}>{zipProgress===null?"전체 PNG ZIP 저장":`압축 중 ${zipProgress}/${cards.length}`}</button></header>
     <div className="workflow"><span className="done">1 제목·본문 입력</span><i>→</i><span className="done">2 카드 만들기</span><i>→</i><span>3 사진·문구 편집</span></div>
     <section className="workspace"><aside className="input-column"><div className="section-head"><span>01</span><div><h2>카드뉴스 내용</h2><p>썸네일 카피와 본문을 입력하면 문장별 카드로 나눠드려요.</p></div></div>
       <label>카드뉴스 제목 <small>(썸네일 카피)</small><input placeholder="1페이지에 들어갈 제목을 입력하세요" value={title} onChange={(e) => setTitle(e.target.value)} /></label>
