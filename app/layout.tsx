@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cardletter — 블로그를 카드뉴스로",
+  title: "제이라이프 카드뉴스 Jlife Cardnews Maker",
   description: "블로그 글의 핵심을 인스타그램 카드뉴스로 바꾸는 제작기",
   icons: {
     icon: "/favicon.svg",
