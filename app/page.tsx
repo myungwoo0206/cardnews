@@ -5,11 +5,11 @@ type Card = { text: string; image?: string; layout: "bottom" | "top" | "center";
 function createCards(title: string, focus: string, previous: Card[]): Card[] {
   const sentences = focus.split(/(?<=[.!?]|다\.)\s+|\n+/).map((s) => s.trim()).filter(Boolean);
   const coverText = title.trim() || sentences.shift() || "";
-  const bodyCards = sentences.slice(0, 6).map((text, index) => ({ ...previous[index + 1], text: text.length > 78 ? `${text.slice(0, 77)}…` : text, layout: previous[index + 1]?.layout || (index % 3 === 0 ? "bottom" : index % 3 === 1 ? "top" : "center") as Card["layout"] }));
+  const bodyCards = sentences.map((text, index) => ({ ...previous[index + 1], text, layout: previous[index + 1]?.layout || (index % 3 === 0 ? "bottom" : index % 3 === 1 ? "top" : "center") as Card["layout"] }));
   return [{ ...previous[0], text: coverText, layout: previous[0]?.layout || "bottom" }, ...bodyCards];
 }
 export default function Home() {
-  const [title, setTitle] = useState(""); const [source, setSource] = useState(""); const [focus, setFocus] = useState("");
+  const [title, setTitle] = useState(""); const [focus, setFocus] = useState("");
   const [cards, setCards] = useState<Card[]>(() => createCards("", "", [])); const [active, setActive] = useState(0); const [activeText, setActiveText] = useState(0); const [editMode, setEditMode] = useState<"image" | "text">("image"); const [pasteMessage, setPasteMessage] = useState("영역을 클릭하고 ⌘V"); const current = cards[active];
   const draggedPage = useRef<number | null>(null);
   useEffect(() => () => cards.forEach((c) => c.image?.startsWith("blob:") && URL.revokeObjectURL(c.image)), []);
@@ -33,10 +33,10 @@ export default function Home() {
   async function saveAll() { for (let i = 0; i < cards.length; i++) { await saveCard(i); await new Promise((r) => setTimeout(r, 180)); } }
   const photoCount = useMemo(() => cards.filter((c) => c.image).length, [cards]);
   return <main className="app-shell"><header><div className="brand"><span>CL</span><b>CARDLETTER</b><small>블로그에서 골라 만드는 카드뉴스</small></div><button className="save-all" onClick={saveAll}>전체 PNG 저장</button></header>
-    <div className="workflow"><span className="done">1 원문 입력</span><i>→</i><span className="done">2 파트 선택</span><i>→</i><span>3 사진·문구 편집</span></div>
-    <section className="workspace"><aside className="input-column"><div className="section-head"><span>01</span><div><h2>블로그 글</h2><p>전체 글을 붙여 넣고, 카드로 만들 부분만 골라주세요.</p></div></div>
-      <label>카드뉴스 제목<input placeholder="제목을 입력하세요" value={title} onChange={(e) => setTitle(e.target.value)} /></label><label>블로그 원문 <em>{source.length.toLocaleString()}자</em><textarea className="source" placeholder="블로그 원문을 붙여 넣으세요" value={source} onChange={(e) => setSource(e.target.value)} /></label>
-      <div className="focus-block"><label>카드로 만들 파트 <em>{focus.length}자</em><textarea placeholder="카드로 만들 부분을 붙여 넣으세요" value={focus} onChange={(e) => setFocus(e.target.value)} /></label><p>💡 원문 중 한 가지 메시지가 이어지는 300~700자를 붙여 넣으면 좋아요.</p></div><button className="primary" onClick={generate}>선택한 파트로 카드 구성하기 <b>→</b></button></aside>
+    <div className="workflow"><span className="done">1 제목·본문 입력</span><i>→</i><span className="done">2 카드 만들기</span><i>→</i><span>3 사진·문구 편집</span></div>
+    <section className="workspace"><aside className="input-column"><div className="section-head"><span>01</span><div><h2>카드뉴스 내용</h2><p>썸네일 카피와 본문을 입력하면 문장별 카드로 나눠드려요.</p></div></div>
+      <label>카드뉴스 제목 <small>(썸네일 카피)</small><input placeholder="1페이지에 들어갈 제목을 입력하세요" value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+      <label>본문 <em>{focus.length.toLocaleString()}자</em><textarea className="card-body-source" placeholder="카드뉴스 본문을 입력하세요. 마침표, 물음표, 느낌표 또는 줄바꿈을 기준으로 카드가 나뉩니다." value={focus} onChange={(e) => setFocus(e.target.value)} /></label><p className="sentence-guide">문장 하나가 카드 한 장이 됩니다. 원하는 위치에서 줄을 바꿔 직접 카드를 나눌 수도 있어요.</p><button className="primary" onClick={generate}>카드 만들기 <b>→</b></button></aside>
       <section className="canvas-column"><div className="section-head"><span>02</span><div><h2>사진과 문구</h2><p>선택한 페이지부터 사진을 넣고, 각 장의 문구를 다듬으세요.</p></div><label className="upload">사진 추가<input type="file" accept="image/*" multiple onChange={addPhotos}/></label></div>
         <div className="paste-zone" onDragOver={(event) => event.preventDefault()} onDrop={dropPhotos} aria-label="복사한 이미지 또는 캡처 붙여넣기"><div className="paste-icon">⌘V</div><div><strong>사진을 복사한 뒤 바로 붙여넣으세요</strong><p>이 영역을 먼저 클릭할 필요 없이, 제작기 화면 어디에서든 <b>⌘V</b></p><small>화면 캡처도 같은 방법으로 추가할 수 있어요 · 파일을 이곳에 끌어놓아도 됩니다.</small></div><em>{pasteMessage}</em></div>
         <div className="editor-grid"><div className="stage"><CardCanvas card={current} index={active} mode={editMode} activeText={activeText} onChange={updateCard} onMoveText={moveText}/></div>
