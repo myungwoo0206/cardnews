@@ -16,6 +16,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@ibm/plex-sans-kr": "^1.1.0",
     "drizzle-orm": "0.45.2",
     "fflate": "^0.8.2",
     "react": "19.2.6",
