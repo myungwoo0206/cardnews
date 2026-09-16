@@ -30,7 +30,23 @@ export default function Home() {
   async function addOverlayImage(event:ChangeEvent<HTMLInputElement>){const file=Array.from(event.target.files||[]).find((item)=>item.type.startsWith("image/"));if(file){const url=URL.createObjectURL(file),image=new Image();image.src=url;try{await image.decode();updateCard({overlayImage:url,overlayAspect:image.width/image.height,overlayWidth:360,overlayX:760,overlayY:1030});setPasteMessage("작은 이미지가 추가됨 · 미리보기에서 바로 끌어 이동하세요")}catch{URL.revokeObjectURL(url)}}event.target.value="";}
   function removeOverlayImage(){updateCard({overlayImage:undefined,overlayAspect:undefined,overlayWidth:undefined,overlayX:undefined,overlayY:undefined});}
   function updateCard(patch: Partial<Card>) { setCards((old) => old.map((c, i) => i === active ? { ...c, ...patch } : c)); }
-  function updateText(value: string) { if (activeText === 0) updateCard({text:value}); else { const extra=[...(current.extraTexts||[])]; extra[activeText-1]={...extra[activeText-1],text:value}; updateCard({extraTexts:extra}); } }
+  function updateText(value: string) {
+    const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
+    if(activeText===0){
+      if(!ctx||(active===0&&current.textStyle!=="point")){updateCard({text:value});return;}
+      const position=defaultTextPosition(current,active),centerX=current.textX??position.x,centerY=current.textY??position.y;
+      const before=textBoxBounds(ctx,current.text,centerX,centerY,current.textStyle,current.textLetterSpacing,current.textWidthScale);
+      const after=textBoxBounds(ctx,value,centerX,centerY,current.textStyle,current.textLetterSpacing,current.textWidthScale);
+      updateCard({text:value,textX:before.x+after.width/2,textY:before.y+after.height/2});
+      return;
+    }
+    const extra=[...(current.extraTexts||[])],item=extra[activeText-1];
+    if(!ctx){extra[activeText-1]={...item,text:value};updateCard({extraTexts:extra});return;}
+    const before=textBoxBounds(ctx,item.text,item.x,item.y,item.style,item.letterSpacing,item.widthScale);
+    const after=textBoxBounds(ctx,value,item.x,item.y,item.style,item.letterSpacing,item.widthScale);
+    extra[activeText-1]={...item,text:value,x:before.x+after.width/2,y:before.y+after.height/2};
+    updateCard({extraTexts:extra});
+  }
   function moveText(textIndex:number,x:number,y:number) { if(textIndex===0) updateCard({textX:x,textY:y}); else { const extra=[...(current.extraTexts||[])]; extra[textIndex-1]={...extra[textIndex-1],x,y}; updateCard({extraTexts:extra}); } }
   function addText(){const extra=[...(current.extraTexts||[]),{text:"새 문구를 입력하세요",x:540,y:360+(current.extraTexts?.length||0)*170}];updateCard({extraTexts:extra});setActiveText(extra.length);}
   function addPointText(){const extra=[...(current.extraTexts||[]),{text:"포인트 문구를 입력하세요",x:540,y:360+(current.extraTexts?.length||0)*170,style:"point" as TextStyle,letterSpacing:-1.5,widthScale:.86}];updateCard({extraTexts:extra});setActiveText(extra.length);}
